@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "handoff/1",
+  "description": "A handoff document: what a fresh agent needs to continue a session. Everything the repo already records (commits, diffs, plans, issues) is referenced in `artifacts`, never copied.",
+  "type": "object",
+  "required": ["schema", "meta", "goal", "state", "environment", "next_step", "resume_prompt"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "handoff/1" },
+    "meta": {
+      "type": "object",
+      "required": ["topic", "project", "created"],
+      "additionalProperties": false,
+      "properties": {
+        "topic": { "type": "string", "description": "kebab-case slug of what the session was about" },
+        "project": { "type": "string", "description": "kebab-case repo or product name; `misc` when there is none" },
+        "created": { "type": "string", "description": "local time, ISO 8601 with offset, from `date`" },
+        "next_session_focus": { "type": "string", "description": "the user's argument: what the next session is for" }
+      }
+    },
+    "goal": { "type": "string", "description": "One or two sentences: what the work is for." },
+    "state": {
+      "type": "object",
+      "required": ["done", "not_verified"],
+      "additionalProperties": false,
+      "properties": {
+        "done": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["item", "verified"],
+            "additionalProperties": false,
+            "properties": {
+              "item": { "type": "string" },
+              "verified": { "type": "boolean", "description": "true only if checked in this session by running or measuring it" },
+              "evidence": { "type": "string", "description": "the command, test or measurement that verified it" }
+            }
+          }
+        },
+        "in_progress": { "type": "array", "items": { "type": "string" } },
+        "not_verified": { "type": "array", "items": { "type": "string" }, "description": "claims, causes and assumptions nobody checked" }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["decision", "why"],
+        "additionalProperties": false,
+        "properties": { "decision": { "type": "string" }, "why": { "type": "string" } }
+      }
+    },
+    "dead_ends": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tried", "result"],
+        "additionalProperties": false,
+        "properties": { "tried": { "type": "string" }, "result": { "type": "string" } }
+      }
+    },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "environment": {
+      "type": "object",
+      "required": ["cwd"],
+      "additionalProperties": false,
+      "properties": {
+        "cwd": { "type": "string" },
+        "branch": { "type": "string" },
+        "head": { "type": "string", "description": "short commit hash" },
+        "uncommitted": { "type": "array", "items": { "type": "string" }, "description": "paths from `git status --short`" },
+        "running": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["what"],
+            "additionalProperties": false,
+            "properties": { "what": { "type": "string" }, "how_to_stop": { "type": "string" } }
+          },
+          "description": "dev servers, background tasks, scheduled jobs left on"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["path", "url", "commit", "issue", "pr", "doc"] },
+          "ref": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "next_step": {
+      "type": "object",
+      "required": ["action"],
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "description": "ONE concrete action doable in minutes" },
+        "why": { "type": "string" },
+        "first_command": { "type": "string" }
+      }
+    },
+    "next_session": {
+      "type": "object",
+      "description": "Optional recommendation for the session that continues the work. Used as the defaults of the launch card; a new session cannot get a higher model or effort than the one writing the handoff.",
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "description": "model id or family name, e.g. a cheaper model for mechanical work" },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max"] },
+        "reason": { "type": "string", "description": "one line: why this model and effort" }
+      }
+    },
+    "verbatim_copy": {
+      "type": "array",
+      "description": "Copy that must be reused exactly as written (app, website or document text, a message to send). Kept in its original language; never translated or rephrased. All other text in the file is English.",
+      "items": {
+        "type": "object",
+        "required": ["where", "language", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "where": { "type": "string", "description": "where the text goes: screen, page, document, recipient" },
+          "language": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "suggested_skills": { "type": "array", "items": { "type": "string" } },
+    "resume_prompt": { "type": "string", "description": "One line the user pastes into the new session; it names this file's absolute path." }
+  }
+}

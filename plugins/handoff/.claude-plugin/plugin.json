@@ -1,0 +1,6 @@
+{
+  "name": "handoff",
+  "version": "0.1.0",
+  "description": "Writes a JSON handoff of the current session so a fresh session can continue the work, and resumes from one.",
+  "license": "MIT"
+}

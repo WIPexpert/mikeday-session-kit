@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "mode": "fixed",
+  "root": "~/handoffs",
+  "layout": "{project}/{yyyy}-{mm}/{yymmdd}-{hhmm}-{topic}.handoff.json",
+  "index": true
+}
