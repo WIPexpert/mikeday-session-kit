@@ -1,9 +1,19 @@
 {
   "name": "session-kit",
-  "owner": { "name": "WIPexpert" },
-  "metadata": { "description": "Tools for long Claude Code sessions: a JSON handoff for the next session, and a prompt when the context grows large." },
+  "owner": {
+    "name": "Mike Daykhin | founder @ talenthunt.work"
+  },
+  "metadata": {
+    "description": "Tools for long Claude Code sessions: a JSON handoff for the next session, and a prompt when the context grows large."
+  },
   "plugins": [
-    { "name": "handoff", "source": "./plugins/handoff" },
-    { "name": "context-guard", "source": "./plugins/context-guard" }
+    {
+      "name": "handoff",
+      "source": "./plugins/handoff"
+    },
+    {
+      "name": "context-guard",
+      "source": "./plugins/context-guard"
+    }
   ]
 }

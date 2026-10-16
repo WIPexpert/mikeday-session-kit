@@ -1,6 +1,8 @@
-# Mike Day Session Kit
+# Session Kit
 
-**Version:** 1 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-16 19:08
+**Version:** 2 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-16 20:02
+
+By Mike Daykhin | founder @ talenthunt.work
 
 Two Claude Code plugins for long sessions. I often do a pile of tasks in one long session, so `context-guard` checks the size of the context after each model answer and, above a threshold, asks what to do: compact, write a handoff, start a new session, or keep going. `handoff` writes a handoff of the session as a JSON file and resumes from one, so a fresh session can pick up what was actually done. The first means you do not have to watch the context yourself. The second lets you pass on the work.
 
