@@ -12,8 +12,29 @@ const HANDOFF = 'Handoff, then new session'
 const FRESH = 'New session (/clear)'
 const KEEP = 'Continue'
 
+const VERSION = '0.4.0'
+
+// Local counters, kept in this plugin's own store on this machine. Nothing is sent anywhere.
+const STAT_NAMES = [
+  'shown',
+  'pctSum',
+  'choice.compact',
+  'choice.handoff',
+  'choice.fresh',
+  'choice.keep',
+  'choice.other',
+  'choice.dismissed',
+  'compact.session',
+  'compact.command',
+  'compact.failed',
+  'handoff.sent',
+  'handoff.failed',
+  'fresh.failed',
+  'firstRun',
+] as const
+
 const USAGE =
-  'Usage: /context-guard <threshold> <step> | off | on | reset. Write each value as a percent of the window ("35%") or as thousands of tokens ("350k" or "350"), for example /context-guard 35% 10%.'
+  'Usage: /context-guard <threshold> <step> | off | on | reset | stats | stats share | stats reset. Write each value as a percent of the window ("35%") or as thousands of tokens ("350k" or "350"), for example /context-guard 35% 10%.'
 
 type Settings = {
   isEnabled: boolean
@@ -102,12 +123,88 @@ const compactAt = async ($: EngineInterface): Promise<number | undefined> => {
 // Compaction goes through `$.session.compact()` where the session allows it. A headless session
 // (the Claude desktop app runs on the SDK) refuses it: there compaction runs as a /compact prompt,
 // so fall back to the command.
-const compactNow = async ($: EngineInterface): Promise<void> => {
+const compactNow = async ($: EngineInterface): Promise<'session' | 'command'> => {
   try {
     await $.session.compact()
+    return 'session'
   } catch {
     await $.command.run({ command: 'compact' })
+    return 'command'
   }
+}
+
+// A counter that cannot be written must never get in the user's way.
+const bump = async ($: EngineInterface, name: string, by = 1): Promise<void> => {
+  try {
+    const key = `stat.${name}`
+    const value = Number(await $.store.get(key))
+    await $.store.set(key, (Number.isFinite(value) ? value : 0) + by)
+    if ((await $.store.get('stat.since')) === undefined) {
+      await $.store.set('stat.since', new Date(await $.clock.now()).toISOString().slice(0, 10))
+    }
+  } catch {
+    // Statistics are optional.
+  }
+}
+
+const readCounts = async ($: EngineInterface): Promise<Record<string, number>> => {
+  const counts: Record<string, number> = {}
+  for (const name of STAT_NAMES) {
+    const value = Number(await $.store.get(`stat.${name}`))
+    counts[name] = Number.isFinite(value) ? value : 0
+  }
+  return counts
+}
+
+const statsText = async ($: EngineInterface): Promise<string> => {
+  const since = await $.store.get('stat.since')
+  if (typeof since !== 'string') {
+    return 'context-guard has no statistics yet. They start counting on this machine when the dialog first appears.'
+  }
+  const n = await readCounts($)
+  const c = (name: string) => n[name] ?? 0
+  const avg = c('shown') > 0 ? Math.round(c('pctSum') / c('shown')) : 0
+  return [
+    `context-guard statistics since ${since} (this machine, all your sessions; nothing is sent anywhere):`,
+    `dialogs shown: ${c('shown')}, on average at ${avg}% of the window`,
+    `answers: Compact ${c('choice.compact')} · Handoff ${c('choice.handoff')} · New session ${c('choice.fresh')} · Continue ${c('choice.keep')} · typed text ${c('choice.other')} · dismissed ${c('choice.dismissed')}`,
+    `compact: ${c('compact.session')} through the session, ${c('compact.command')} through /compact, ${c('compact.failed')} failed`,
+    `handoff requests: ${c('handoff.sent')} sent, ${c('handoff.failed')} failed · /clear failed: ${c('fresh.failed')}`,
+    `first-run questions answered: ${c('firstRun')}`,
+  ].join('\n')
+}
+
+// Counts and settings only: no texts, paths, names or ids. The user decides whether to share it.
+const statsShare = async ($: EngineInterface, settings: Settings, windowTokens: number): Promise<string> => {
+  const since = await $.store.get('stat.since')
+  const n = await readCounts($)
+  const c = (name: string) => n[name] ?? 0
+  return JSON.stringify(
+    {
+      tool: 'context-guard',
+      version: VERSION,
+      since: typeof since === 'string' ? since : null,
+      windowTokens,
+      thresholdPct: settings.thresholdPct,
+      stepPct: settings.stepPct,
+      dialogsShown: c('shown'),
+      averagePctAtAsk: c('shown') > 0 ? Math.round(c('pctSum') / c('shown')) : null,
+      answers: {
+        compact: c('choice.compact'),
+        handoff: c('choice.handoff'),
+        newSession: c('choice.fresh'),
+        continue: c('choice.keep'),
+        typed: c('choice.other'),
+        dismissed: c('choice.dismissed'),
+      },
+      compact: { viaSession: c('compact.session'), viaCommand: c('compact.command'), failed: c('compact.failed') },
+      handoffRequests: { sent: c('handoff.sent'), failed: c('handoff.failed') },
+      clearFailed: c('fresh.failed'),
+      firstRunAnswered: c('firstRun'),
+    },
+    null,
+    2,
+  )
 }
 
 export const register: Register = on => {
@@ -119,7 +216,7 @@ export const register: Register = on => {
       await $.command.register({
         name: 'context-guard',
         description: 'Show or set when the context-size prompt appears (percent of the window, or k tokens).',
-        argumentHint: '[<threshold> <step> | off | on | reset]',
+        argumentHint: '[<threshold> <step> | off | on | reset | stats | stats share | stats reset]',
       })
     } catch (err) {
       // A taken name must not stop the session from starting.
@@ -129,7 +226,7 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'context-guard' }, async ($, e) => {
-    const args = e.args.trim().toLowerCase()
+    const args = e.args.trim().toLowerCase().replace(/\s+/g, ' ')
     const { context } = await $.session.usage()
     const windowTokens = context.window
     const settings = await readSettings($, windowTokens)
@@ -140,6 +237,16 @@ export const register: Register = on => {
     if (args === 'off' || args === 'on') {
       await $.store.set('enabled', args === 'on')
       return { text: `context-guard is ${args}.` }
+    }
+    if (args === 'stats') return { text: await statsText($) }
+    if (args === 'stats share') {
+      const shared = await statsShare($, settings, windowTokens)
+      return { text: `Counts only, no texts, paths or names. Paste it into a GitHub issue if you want to share it.\n${shared}` }
+    }
+    if (args === 'stats reset') {
+      for (const name of STAT_NAMES) await $.store.delete(`stat.${name}`)
+      await $.store.delete('stat.since')
+      return { text: 'context-guard statistics cleared.' }
     }
     if (args === 'reset') {
       await $.store.set('configured', false)
@@ -193,6 +300,7 @@ export const register: Register = on => {
           await $.store.set('thresholdPct', thresholdPct)
           await $.store.set('stepPct', stepPct)
           await $.store.set('configured', true)
+          await bump($, 'firstRun')
           $.ui.toast(`context-guard: asking at ${thresholdPct}% of the window, then every ${stepPct}%. Change it with /context-guard.`, {
             timeoutMs: 8000,
           })
@@ -228,14 +336,21 @@ export const register: Register = on => {
         nextAskAt = tokens + stepTokens
       }
       try {
+        const pct = context.percent ?? Math.round((tokens / windowTokens) * 100)
+        await bump($, 'shown')
+        await bump($, 'pctSum', pct)
         const answer = await $.ui.ask(
-          `Context is ${context.percent ?? Math.round((tokens / windowTokens) * 100)}% of the window (${fmtK(tokens).toUpperCase()} tokens). What now?`,
+          `Context is ${pct}% of the window (${fmtK(tokens).toUpperCase()} tokens). What now?`,
           { header: 'Context', options },
         )
+        const choice = answer === COMPACT ? 'compact' : answer === HANDOFF ? 'handoff' : answer === FRESH ? 'fresh' : answer === KEEP ? 'keep' : 'other'
+        await bump($, `choice.${choice}`)
         if (answer === COMPACT) {
           try {
-            await compactNow($)
+            const route = await compactNow($)
+            await bump($, route === 'session' ? 'compact.session' : 'compact.command')
           } catch (err) {
+            await bump($, 'compact.failed')
             failed('compact', err, '/compact')
           }
         } else if (answer === HANDOFF) {
@@ -245,19 +360,23 @@ export const register: Register = on => {
             await $.prompt.submit({
               text: 'Invoke the handoff skill and write a handoff document for this conversation, so a fresh session can pick up the work. Then tell me the file path.',
             })
+            await bump($, 'handoff.sent')
           } catch (err) {
+            await bump($, 'handoff.failed')
             failed('handoff request', err)
           }
         } else if (answer === FRESH) {
           try {
             await $.command.run({ command: 'clear' })
           } catch (err) {
+            await bump($, 'fresh.failed')
             failed('/clear', err, '/clear')
           }
         } else {
           nextAskAt = tokens + stepTokens
         }
       } catch (err) {
+        await bump($, 'choice.dismissed')
         $.ui.log(`context-guard: ${String(err)}`, { to: 'debug' })
         // Dialog dismissed: treat as Continue.
         nextAskAt = tokens + stepTokens

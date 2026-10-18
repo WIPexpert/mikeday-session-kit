@@ -306,3 +306,87 @@ test('Compact falls back to /compact where session.compact is refused (a headles
   expect(ran).toBe(1)
   expect(toasts.join('\n')).not.toContain('failed')
 })
+
+// ---- local statistics ----
+
+const stats = async ($: Parameters<Parameters<typeof test>[1]>[0], args = 'stats') =>
+  ((await $.command.run({ command: 'context-guard', args })).text ?? '') as string
+
+test('statistics are empty before the first dialog', async ($, on) => {
+  world(on, 10_000)
+  mock.store(on, settings)
+  expect(await stats($)).toContain('no statistics yet')
+})
+
+test('statistics count the dialog and the answer, and say nothing is sent', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Continue'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  const text = await stats($)
+  expect(text).toContain('dialogs shown: 1, on average at 36% of the window')
+  expect(text).toContain('Continue 1')
+  expect(text).toContain('Compact 0')
+  expect(text).toContain('nothing is sent anywhere')
+})
+
+test('statistics count which way a compact went', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('ui.toast', () => ({ value: undefined }))
+  on('command.run', { command: 'compact' }, () => ({ text: 'compacted' }))
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Compact'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  expect(await stats($)).toContain('compact: 0 through the session, 1 through /compact, 0 failed')
+})
+
+test('statistics count a failed compact', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Compact'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  expect(await stats($)).toContain('1 failed')
+})
+
+test('statistics count a dismissed dialog', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('tool.call', { tool: 'AskUserQuestion' }, () => ({ deny: 'dismissed' }))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  const text = await stats($)
+  expect(text).toContain('dialogs shown: 1')
+  expect(text).toContain('dismissed 1')
+})
+
+test('stats share prints counts and settings only, as JSON', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Continue'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  const text = await stats($, 'stats share')
+  expect(text).toContain('Counts only')
+  const shared = JSON.parse(text.slice(text.indexOf('{')))
+  expect(shared.dialogsShown).toBe(1)
+  expect(shared.answers.continue).toBe(1)
+  expect(shared.thresholdPct).toBe(35)
+  expect(shared.stepPct).toBe(10)
+  expect(shared.windowTokens).toBe(1_000_000)
+  expect(text).not.toContain('/Users')
+})
+
+test('stats reset clears the counters', async ($, on) => {
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Continue'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  expect(await stats($)).toContain('dialogs shown: 1')
+  expect(await stats($, 'stats reset')).toContain('cleared')
+  expect(await stats($)).toContain('no statistics yet')
+})

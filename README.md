@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 5 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:48
+**Version:** 6 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:56
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -67,7 +67,7 @@ Details:
 - In the Claude desktop app the skill offers the continuation as a launch card with a model and effort. A card cannot start a session on a higher model or effort than the one that wrote the handoff. For a stronger model the card is a gate: the new session first asks you to switch the model and waits for "go". Elsewhere the skill prints the one-line prompt.
 - `handoff` is a skill in the [Agent Skills](https://agentskills.io) format, so other agents can load it. Only Claude Code was tested.
 
-## context-guard (0.3.2)
+## context-guard (0.4.0)
 
 `context-guard` is a Claude Code mod: a plugin with code that runs inside Claude Code. After each model answer it checks the context size. Past the threshold it asks:
 
@@ -97,14 +97,21 @@ The `/context-guard` command:
 | `/context-guard off` | Switches it off |
 | `/context-guard on` | Switches it on |
 | `/context-guard reset` | Asks for the values again after the next answer |
+| `/context-guard stats` | Shows your own usage counts |
+| `/context-guard stats share` | Prints the counts as JSON you can paste into an issue |
+| `/context-guard stats reset` | Clears the counts |
 
 Settings are shared by all your sessions. Version 0.2.x kept them in tokens; the first run of 0.3.0 converts them.
+
+### Local statistics
+
+To help you see how you use it, `context-guard` counts a few things in its own store on your machine: how many times the dialog appeared and at what share of the window, how often you picked each answer, whether Compact went through the session or through `/compact`, how many handoff requests were sent, and how many actions failed. `/context-guard stats` shows the counts. Nothing is sent anywhere: the counts never leave your machine unless you copy `/context-guard stats share` into a message yourself. It holds counts and your two settings, no texts, paths, names or ids. `/context-guard stats reset` clears it.
 
 ## Requirements and limits
 
 - Claude Code 2.1.287 or later (the Desktop app from 2.1.286) for `context-guard`. In Desktop's WSL sessions plugins are unavailable.
 - The Claude Code mods API can change between releases. Tested with Claude Code 2.1.295 on macOS, Python 3.14 and `jsonschema` 4.26. Other versions and systems are untested.
-- Run live: the `context-guard` dialog and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the `/clear` choice, the re-ask after Continue, the failure messages and the `/compact` fallback for sessions that refuse `session.compact`.
+- Run live: the `context-guard` dialog and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the `/clear` choice, the re-ask after Continue, the failure messages, the `/compact` fallback for sessions that refuse `session.compact`, and the statistics.
 - Other agents: only the handoff file and the skill format are portable. Nobody has run `handoff` in Codex or Gemini CLI yet.
 
 The `context-guard` tests run with:
@@ -115,10 +122,10 @@ claude plugin test plugins/context-guard
 
 ## What a mod can reach
 
-A mod runs inside Claude Code with your permissions and is not sandboxed. Install mods only from sources you trust, and read what a mod does first. `claude plugin validate plugins/context-guard` lists what `context-guard` does: it reads the context size and the list of commands, asks you questions, can start a compact or `/clear`, can submit one prompt (the handoff request), and keeps its own settings in its own store. It reads no files and runs no processes, and it makes no network requests. The exact calls it makes:
+A mod runs inside Claude Code with your permissions and is not sandboxed. Install mods only from sources you trust, and read what a mod does first. `claude plugin validate plugins/context-guard` lists what `context-guard` does: it reads the context size and the list of commands, asks you questions, can start a compact or `/clear`, can submit one prompt (the handoff request), and keeps its settings and counts in its own store. It reads no files and runs no processes, and it makes no network requests. The exact calls it makes:
 
 ```text
-$.clock.after, $.command.list, $.command.register, $.command.run, $.prompt.submit, $.session.compact,
+$.clock.after, $.clock.now, $.command.list, $.command.register, $.command.run, $.prompt.submit, $.session.compact,
 $.session.surfaces, $.session.usage, $.store.delete, $.store.get, $.store.set, $.ui.ask, $.ui.log, $.ui.toast
 ```
 
