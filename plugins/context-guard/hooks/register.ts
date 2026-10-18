@@ -217,7 +217,7 @@ export const register: Register = on => {
       }
       try {
         const answer = await $.ui.ask(
-          `Context is ${fmtK(tokens)} tokens (${context.percent ?? '?'}% of the window). What now?`,
+          `Context is ${context.percent ?? Math.round((tokens / windowTokens) * 100)}% of the window (${fmtK(tokens).toUpperCase()} tokens). What now?`,
           { header: 'Context', options },
         )
         if (answer === COMPACT) {

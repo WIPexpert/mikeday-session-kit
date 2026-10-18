@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 3 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:40
+**Version:** 4 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:42
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -67,12 +67,12 @@ Details:
 - In the Claude desktop app the skill offers the continuation as a launch card with a model and effort. A card cannot start a session on a higher model or effort than the one that wrote the handoff. For a stronger model the card is a gate: the new session first asks you to switch the model and waits for "go". Elsewhere the skill prints the one-line prompt.
 - `handoff` is a skill in the [Agent Skills](https://agentskills.io) format, so other agents can load it. Only Claude Code was tested.
 
-## context-guard (0.3.0)
+## context-guard (0.3.1)
 
 `context-guard` is a Claude Code mod: a plugin with code that runs inside Claude Code. After each model answer it checks the context size. Past the threshold it asks:
 
 ```
-Context is 354k tokens (35% of the window). What now?
+Context is 35% of the window (354K tokens). What now?
 ```
 
 The choices are `Compact`, `Handoff, then new session`, `New session (/clear)` and `Continue`.

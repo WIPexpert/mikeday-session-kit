@@ -68,6 +68,7 @@ test('stays quiet below the threshold', async ($, on) => {
 test('asks above the threshold and compacts on "Compact"', async ($, on) => {
   let asked = 0
   let compacted = 0
+  let question = ''
   const clock = world(on, 360_000)
   mock.store(on, settings)
   on('session.compact', () => {
@@ -76,12 +77,14 @@ test('asks above the threshold and compacts on "Compact"', async ($, on) => {
   })
   on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
     asked++
+    question = e.questions[0].question
     return answer(e, 'Compact')
   })
   await $.turn.complete(complete)
   await clock.advance(1000)
   expect(asked).toBe(1)
   expect(compacted).toBe(1)
+  expect(question).toBe('Context is 36% of the window (360K tokens). What now?')
 })
 
 test('uses the stored percent, not the default', async ($, on) => {
