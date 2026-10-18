@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 12 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 19:03
+**Version:** 13 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 20:44
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -131,7 +131,7 @@ To help you see how you use it, `context-guard` counts a few things in its own s
 
 - Claude Code 2.1.287 or later (the Desktop app from 2.1.286) for `context-guard`. In Desktop's WSL sessions plugins are unavailable.
 - The Claude Code mods API can change between releases. Tested with Claude Code 2.1.295 on macOS, Python 3.14 and `jsonschema` 4.26. Other versions and systems are untested.
-- Run live: the `context-guard` dialog with the choices `Continue` and `New session (/clear)`, the band above the prompt with its confirmation and `Cancel` focus (in the terminal and in the Claude desktop app), and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the re-ask after Continue, the failure messages, the `/compact` fallback for sessions that refuse `session.compact`, the statistics, `/context-guard ask`, and the spinner tail.
+- Run live: the `context-guard` dialog with the choices `Continue` and `New session (/clear)`, the band above the prompt with its confirmation and `Cancel` focus (in the terminal and in the Claude desktop app), the spinner tail, the re-ask after `Continue`, `/context-guard ask`, and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the failure messages, the `/compact` fallback for sessions that refuse `session.compact`, and the statistics.
 - Other agents: only the handoff file and the skill format are portable. Nobody has run `handoff` in Codex or Gemini CLI yet.
 
 The `context-guard` tests run with:
