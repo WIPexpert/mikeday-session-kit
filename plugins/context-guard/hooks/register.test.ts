@@ -278,9 +278,31 @@ test('a failed action is shown to the user, not hidden', async ($, on) => {
     toasts.push(JSON.stringify(e))
     return { value: undefined }
   })
-  // Nothing answers session.compact, so the call rejects.
+  // Nothing answers session.compact or the /compact command, so both reject.
   on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Compact'))
   await $.turn.complete(complete)
   await clock.advance(1000)
   expect(toasts.join('\n')).toContain('compact failed')
+  expect(toasts.join('\n')).toContain('Run /compact yourself')
+})
+
+test('Compact falls back to /compact where session.compact is refused (a headless or SDK session)', async ($, on) => {
+  const toasts: string[] = []
+  let ran = 0
+  const clock = world(on, 360_000)
+  mock.store(on, settings)
+  on('ui.toast', (_$, e) => {
+    toasts.push(JSON.stringify(e))
+    return { value: undefined }
+  })
+  // session.compact has no answer here, so it rejects, as in the desktop app.
+  on('command.run', { command: 'compact' }, () => {
+    ran++
+    return { text: 'compacted' }
+  })
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Compact'))
+  await $.turn.complete(complete)
+  await clock.advance(1000)
+  expect(ran).toBe(1)
+  expect(toasts.join('\n')).not.toContain('failed')
 })

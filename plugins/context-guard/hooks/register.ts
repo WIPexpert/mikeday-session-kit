@@ -99,6 +99,17 @@ const compactAt = async ($: EngineInterface): Promise<number | undefined> => {
   }
 }
 
+// Compaction goes through `$.session.compact()` where the session allows it. A headless session
+// (the Claude desktop app runs on the SDK) refuses it: there compaction runs as a /compact prompt,
+// so fall back to the command.
+const compactNow = async ($: EngineInterface): Promise<void> => {
+  try {
+    await $.session.compact()
+  } catch {
+    await $.command.run({ command: 'compact' })
+  }
+}
+
 export const register: Register = on => {
   let nextAskAt: number | undefined
   let isBusy = false
@@ -211,8 +222,9 @@ export const register: Register = on => {
     // Defer so the turn is fully over before the dialog and any compact run.
     $.clock.after(300, async () => {
       // An action that fails must not fail silently: the user chose it.
-      const failed = (action: string, err: unknown) => {
-        $.ui.toast(`context-guard: ${action} failed: ${String(err)}`, { timeoutMs: 10000 })
+      const failed = (action: string, err: unknown, manual?: string) => {
+        const hint = manual ? ` Run ${manual} yourself.` : ''
+        $.ui.toast(`context-guard: ${action} failed: ${String(err)}${hint}`, { timeoutMs: 12000 })
         nextAskAt = tokens + stepTokens
       }
       try {
@@ -222,9 +234,9 @@ export const register: Register = on => {
         )
         if (answer === COMPACT) {
           try {
-            await $.session.compact()
+            await compactNow($)
           } catch (err) {
-            failed('compact', err)
+            failed('compact', err, '/compact')
           }
         } else if (answer === HANDOFF) {
           $.ui.toast('After the handoff is written, run /clear and paste the path into the new session.', { timeoutMs: 12000 })
@@ -240,7 +252,7 @@ export const register: Register = on => {
           try {
             await $.command.run({ command: 'clear' })
           } catch (err) {
-            failed('/clear', err)
+            failed('/clear', err, '/clear')
           }
         } else {
           nextAskAt = tokens + stepTokens

@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 4 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:42
+**Version:** 5 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 12:48
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -67,7 +67,7 @@ Details:
 - In the Claude desktop app the skill offers the continuation as a launch card with a model and effort. A card cannot start a session on a higher model or effort than the one that wrote the handoff. For a stronger model the card is a gate: the new session first asks you to switch the model and waits for "go". Elsewhere the skill prints the one-line prompt.
 - `handoff` is a skill in the [Agent Skills](https://agentskills.io) format, so other agents can load it. Only Claude Code was tested.
 
-## context-guard (0.3.1)
+## context-guard (0.3.2)
 
 `context-guard` is a Claude Code mod: a plugin with code that runs inside Claude Code. After each model answer it checks the context size. Past the threshold it asks:
 
@@ -80,7 +80,7 @@ The choices are `Compact`, `Handoff, then new session`, `New session (/clear)` a
 - **Handoff, then new session** appears only when a handoff skill is installed. Choosing it asks the agent to write a handoff for this conversation and tell you the path. A message then says to run `/clear` afterwards and paste the path into the new session.
 - **Continue** keeps the session going. The next question comes when the context has grown by the re-ask step. Dismissing the dialog counts as Continue.
 - When the context drops below the threshold again (after a compact or a clear), the base threshold applies again.
-- If an action fails, for example the compact is refused, a message says so.
+- Compact calls the session's own compaction. Where the session refuses that call, as the Claude desktop app does, it runs `/compact` for you. If an action fails anyway, a message says so and tells you which command to type.
 - It asks nothing in a session where nobody can answer, such as `claude -p`.
 
 **Thresholds are a share of the model's context window**, the "used" figure of the Context panel. Defaults: 35% for the threshold and 10% for the re-ask step, which is 350k and 100k tokens on a 1M window. A share stays right when the window is smaller: Claude Opus 4.6 and Sonnet 4.6 have 200k unless you use the `[1m]` variant, and then 35% is 70k.
@@ -104,7 +104,7 @@ Settings are shared by all your sessions. Version 0.2.x kept them in tokens; the
 
 - Claude Code 2.1.287 or later (the Desktop app from 2.1.286) for `context-guard`. In Desktop's WSL sessions plugins are unavailable.
 - The Claude Code mods API can change between releases. Tested with Claude Code 2.1.295 on macOS, Python 3.14 and `jsonschema` 4.26. Other versions and systems are untested.
-- Run live: the `context-guard` dialog and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the `/clear` choice, the re-ask after Continue and the failure messages.
+- Run live: the `context-guard` dialog and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the `/clear` choice, the re-ask after Continue, the failure messages and the `/compact` fallback for sessions that refuse `session.compact`.
 - Other agents: only the handoff file and the skill format are portable. Nobody has run `handoff` in Codex or Gemini CLI yet.
 
 The `context-guard` tests run with:
