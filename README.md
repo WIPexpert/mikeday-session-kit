@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 11 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 18:55
+**Version:** 12 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 19:03
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -67,7 +67,7 @@ Details:
 - In the Claude desktop app the skill offers the continuation as a launch card with a model and effort. A card cannot start a session on a higher model or effort than the one that wrote the handoff. For a stronger model the card is a gate: the new session first asks you to switch the model and waits for "go". Elsewhere the skill prints the one-line prompt.
 - `handoff` is a skill in the [Agent Skills](https://agentskills.io) format, so other agents can load it. Only Claude Code was tested.
 
-## context-guard (0.6.3)
+## context-guard (0.6.5)
 
 `context-guard` is a Claude Code mod: a plugin with code that runs inside Claude Code. After each model answer it checks the context size. Past the threshold it asks:
 
@@ -131,7 +131,7 @@ To help you see how you use it, `context-guard` counts a few things in its own s
 
 - Claude Code 2.1.287 or later (the Desktop app from 2.1.286) for `context-guard`. In Desktop's WSL sessions plugins are unavailable.
 - The Claude Code mods API can change between releases. Tested with Claude Code 2.1.295 on macOS, Python 3.14 and `jsonschema` 4.26. Other versions and systems are untested.
-- Run live: the `context-guard` dialog with the choices `Continue` and `New session (/clear)`, and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the re-ask after Continue, the failure messages, the `/compact` fallback for sessions that refuse `session.compact`, the statistics, `/context-guard ask`, and the band above the prompt with its spinner tail.
+- Run live: the `context-guard` dialog with the choices `Continue` and `New session (/clear)`, the band above the prompt with its confirmation and `Cancel` focus (in the terminal and in the Claude desktop app), and continuing a new session from a pasted handoff line, plus both launch cards (a model and effort below the current session's, and the gate for a stronger model). Covered by tests only: the percent thresholds, the first-run questions, the `/context-guard` command, the 0.2.x conversion, the re-ask after Continue, the failure messages, the `/compact` fallback for sessions that refuse `session.compact`, the statistics, `/context-guard ask`, and the spinner tail.
 - Other agents: only the handoff file and the skill format are portable. Nobody has run `handoff` in Codex or Gemini CLI yet.
 
 The `context-guard` tests run with:

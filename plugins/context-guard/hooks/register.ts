@@ -12,7 +12,7 @@ const HANDOFF = 'Handoff, then new session'
 const FRESH = 'New session (/clear)'
 const KEEP = 'Continue'
 
-const VERSION = '0.6.3'
+const VERSION = '0.6.5'
 
 // Local counters, kept in this plugin's own store on this machine. Nothing is sent anywhere.
 const STAT_NAMES = [

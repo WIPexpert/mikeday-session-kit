@@ -1,6 +1,6 @@
 # Install session-kit (instructions for an AI agent)
 
-**Version:** 1 · **Created:** 2026-10-18 12:40 · **Updated:** 2026-10-18 12:40
+**Version:** 2 · **Created:** 2026-10-18 12:40 · **Updated:** 2026-10-18 19:03
 
 You are an AI coding agent. A person asked you to install session-kit from https://github.com/WIPexpert/mikeday-session-kit. Follow these steps in order.
 
@@ -16,7 +16,7 @@ Rules for you:
 Two separate parts:
 
 - `handoff` is a skill. It writes a JSON handoff of the current session so a fresh session can continue the work, and resumes from one. It uses the Agent Skills format, so it can work in many agents.
-- `context-guard` is a Claude Code mod, a plugin with code that runs inside Claude Code with the person's permissions. It asks what to do when the context grows large. It works only in Claude Code. It does not read files, run processes or use the network; `claude plugin validate` on its folder lists its calls.
+- `context-guard` is a Claude Code mod, a plugin with code that runs inside Claude Code with the person's permissions. It shows how full the context is in a one-line band above the prompt, with Compact, Handoff and Clear buttons, and asks what to do when the context grows large. It works only in Claude Code. It does not read files, run processes or use the network; `claude plugin validate` on its folder lists its calls.
 
 ## Step 1: find out which agent you are
 
@@ -84,6 +84,6 @@ Tell the person, in a few lines:
 
 - what you installed and what you did not
 - that the first time they ask for a handoff, the skill asks once where to save handoffs
-- that `context-guard` asks two short questions after its first answer, to set when it speaks up (Claude Code only)
+- that `context-guard` asks two short questions after its first answer, to set when it speaks up, and then shows a one-line band above the prompt (Claude Code only)
 - how to use it: say "write a handoff" (Claude Code: `/handoff`; Codex: `$handoff`), then paste the one-line prompt it prints into a new session
 - where to report problems: https://github.com/WIPexpert/mikeday-session-kit/issues

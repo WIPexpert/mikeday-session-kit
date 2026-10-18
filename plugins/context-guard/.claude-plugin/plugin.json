@@ -1,6 +1,6 @@
 {
   "name": "context-guard",
-  "version": "0.6.3",
+  "version": "0.6.5",
   "description": "When the session context passes a size threshold, asks whether to compact, start fresh, or keep going.",
   "license": "MIT",
   "author": {
