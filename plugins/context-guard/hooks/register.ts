@@ -12,7 +12,7 @@ const HANDOFF = 'Handoff, then new session'
 const FRESH = 'New session (/clear)'
 const KEEP = 'Continue'
 
-const VERSION = '0.4.0'
+const VERSION = '0.5.0'
 
 // Local counters, kept in this plugin's own store on this machine. Nothing is sent anywhere.
 const STAT_NAMES = [
@@ -34,7 +34,7 @@ const STAT_NAMES = [
 ] as const
 
 const USAGE =
-  'Usage: /context-guard <threshold> <step> | off | on | reset | stats | stats share | stats reset. Write each value as a percent of the window ("35%") or as thousands of tokens ("350k" or "350"), for example /context-guard 35% 10%.'
+  'Usage: /context-guard <threshold> <step> | off | on | reset | ask | stats | stats share | stats reset. Write each value as a percent of the window ("35%") or as thousands of tokens ("350k" or "350"), for example /context-guard 35% 10%.'
 
 type Settings = {
   isEnabled: boolean
@@ -207,6 +207,84 @@ const statsShare = async ($: EngineInterface, settings: Settings, windowTokens: 
   )
 }
 
+// The handoff option appears only when a handoff skill is installed. If the command list cannot be
+// read, assume the skill is there rather than hide the option.
+const dialogOptions = async ($: EngineInterface): Promise<string[]> => {
+  const commands = await $.command.list().catch(() => undefined)
+  const hasHandoff = commands === undefined || commands.some(c => c.name === 'handoff' || c.name.endsWith(':handoff'))
+  return hasHandoff ? [COMPACT, HANDOFF, FRESH, KEEP] : [COMPACT, FRESH, KEEP]
+}
+
+type DialogParams = {
+  tokens: number
+  windowTokens: number
+  percent: number | undefined
+  options: string[]
+  // A preview (`/context-guard ask`) is not counted in the statistics.
+  isPreview: boolean
+  // Called when the answer means "not now": the caller waits before asking again.
+  snooze: () => void
+}
+
+// The dialog and what each answer does. The buttons really act, also in a preview.
+const runDialog = async ($: EngineInterface, p: DialogParams): Promise<void> => {
+  const count = async (name: string, by = 1): Promise<void> => {
+    if (!p.isPreview) await bump($, name, by)
+  }
+  // An action that fails must not fail silently: the user chose it.
+  const failed = (action: string, err: unknown, manual?: string) => {
+    const hint = manual ? ` Run ${manual} yourself.` : ''
+    $.ui.toast(`context-guard: ${action} failed: ${String(err)}${hint}`, { timeoutMs: 12000 })
+    p.snooze()
+  }
+  try {
+    const pct = p.percent ?? Math.round((p.tokens / p.windowTokens) * 100)
+    await count('shown')
+    await count('pctSum', pct)
+    const answer = await $.ui.ask(`Context is ${pct}% of the window (${fmtK(p.tokens).toUpperCase()} tokens). What now?`, {
+      header: 'Context',
+      options: p.options,
+    })
+    const choice = answer === COMPACT ? 'compact' : answer === HANDOFF ? 'handoff' : answer === FRESH ? 'fresh' : answer === KEEP ? 'keep' : 'other'
+    await count(`choice.${choice}`)
+    if (answer === COMPACT) {
+      try {
+        const route = await compactNow($)
+        await count(route === 'session' ? 'compact.session' : 'compact.command')
+      } catch (err) {
+        await count('compact.failed')
+        failed('compact', err, '/compact')
+      }
+    } else if (answer === HANDOFF) {
+      $.ui.toast('After the handoff is written, run /clear and paste the path into the new session.', { timeoutMs: 12000 })
+      try {
+        // prompt.submit refuses text starting with "/", so the skill is asked for in words.
+        await $.prompt.submit({
+          text: 'Invoke the handoff skill and write a handoff document for this conversation, so a fresh session can pick up the work. Then tell me the file path.',
+        })
+        await count('handoff.sent')
+      } catch (err) {
+        await count('handoff.failed')
+        failed('handoff request', err)
+      }
+    } else if (answer === FRESH) {
+      try {
+        await $.command.run({ command: 'clear' })
+      } catch (err) {
+        await count('fresh.failed')
+        failed('/clear', err, '/clear')
+      }
+    } else {
+      p.snooze()
+    }
+  } catch (err) {
+    await count('choice.dismissed')
+    $.ui.log(`context-guard: ${String(err)}`, { to: 'debug' })
+    // Dialog dismissed: treat as Continue.
+    p.snooze()
+  }
+}
+
 export const register: Register = on => {
   let nextAskAt: number | undefined
   let isBusy = false
@@ -216,7 +294,7 @@ export const register: Register = on => {
       await $.command.register({
         name: 'context-guard',
         description: 'Show or set when the context-size prompt appears (percent of the window, or k tokens).',
-        argumentHint: '[<threshold> <step> | off | on | reset | stats | stats share | stats reset]',
+        argumentHint: '[<threshold> <step> | off | on | reset | ask | stats | stats share | stats reset]',
       })
     } catch (err) {
       // A taken name must not stop the session from starting.
@@ -237,6 +315,28 @@ export const register: Register = on => {
     if (args === 'off' || args === 'on') {
       await $.store.set('enabled', args === 'on')
       return { text: `context-guard is ${args}.` }
+    }
+    if (args === 'ask') {
+      if (!(await hasSurface($))) return { text: 'Nobody can answer a dialog in this session.' }
+      if (isBusy) return { text: 'A context-guard dialog is already on its way.' }
+      const options = await dialogOptions($)
+      const tokens = context.tokens ?? 0
+      isBusy = true
+      $.clock.after(300, async () => {
+        try {
+          await runDialog($, {
+            tokens,
+            windowTokens,
+            percent: context.percent,
+            options,
+            isPreview: true,
+            snooze: () => {},
+          })
+        } finally {
+          isBusy = false
+        }
+      })
+      return { text: 'The context-guard dialog opens now with the current numbers. The buttons really act. This opening is not counted in the statistics.' }
     }
     if (args === 'stats') return { text: await statsText($) }
     if (args === 'stats share') {
@@ -320,66 +420,22 @@ export const register: Register = on => {
     if (tokens < thresholdTokens) nextAskAt = undefined
     if (tokens < (nextAskAt ?? thresholdTokens)) return done
 
-    // Offer the handoff option only when a handoff skill is installed.
-    // If the listing cannot be read, assume the skill is there rather than hide the option.
-    const commands = await $.command.list().catch(() => undefined)
-    const hasHandoff = commands === undefined || commands.some(c => c.name === 'handoff' || c.name.endsWith(':handoff'))
-    const options = hasHandoff ? [COMPACT, HANDOFF, FRESH, KEEP] : [COMPACT, FRESH, KEEP]
+    const options = await dialogOptions($)
 
     isBusy = true
     // Defer so the turn is fully over before the dialog and any compact run.
     $.clock.after(300, async () => {
-      // An action that fails must not fail silently: the user chose it.
-      const failed = (action: string, err: unknown, manual?: string) => {
-        const hint = manual ? ` Run ${manual} yourself.` : ''
-        $.ui.toast(`context-guard: ${action} failed: ${String(err)}${hint}`, { timeoutMs: 12000 })
-        nextAskAt = tokens + stepTokens
-      }
       try {
-        const pct = context.percent ?? Math.round((tokens / windowTokens) * 100)
-        await bump($, 'shown')
-        await bump($, 'pctSum', pct)
-        const answer = await $.ui.ask(
-          `Context is ${pct}% of the window (${fmtK(tokens).toUpperCase()} tokens). What now?`,
-          { header: 'Context', options },
-        )
-        const choice = answer === COMPACT ? 'compact' : answer === HANDOFF ? 'handoff' : answer === FRESH ? 'fresh' : answer === KEEP ? 'keep' : 'other'
-        await bump($, `choice.${choice}`)
-        if (answer === COMPACT) {
-          try {
-            const route = await compactNow($)
-            await bump($, route === 'session' ? 'compact.session' : 'compact.command')
-          } catch (err) {
-            await bump($, 'compact.failed')
-            failed('compact', err, '/compact')
-          }
-        } else if (answer === HANDOFF) {
-          $.ui.toast('After the handoff is written, run /clear and paste the path into the new session.', { timeoutMs: 12000 })
-          try {
-            // prompt.submit refuses text starting with "/", so the skill is asked for in words.
-            await $.prompt.submit({
-              text: 'Invoke the handoff skill and write a handoff document for this conversation, so a fresh session can pick up the work. Then tell me the file path.',
-            })
-            await bump($, 'handoff.sent')
-          } catch (err) {
-            await bump($, 'handoff.failed')
-            failed('handoff request', err)
-          }
-        } else if (answer === FRESH) {
-          try {
-            await $.command.run({ command: 'clear' })
-          } catch (err) {
-            await bump($, 'fresh.failed')
-            failed('/clear', err, '/clear')
-          }
-        } else {
-          nextAskAt = tokens + stepTokens
-        }
-      } catch (err) {
-        await bump($, 'choice.dismissed')
-        $.ui.log(`context-guard: ${String(err)}`, { to: 'debug' })
-        // Dialog dismissed: treat as Continue.
-        nextAskAt = tokens + stepTokens
+        await runDialog($, {
+          tokens,
+          windowTokens,
+          percent: context.percent,
+          options,
+          isPreview: false,
+          snooze: () => {
+            nextAskAt = tokens + stepTokens
+          },
+        })
       } finally {
         isBusy = false
       }

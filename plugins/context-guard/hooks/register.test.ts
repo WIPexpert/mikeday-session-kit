@@ -390,3 +390,52 @@ test('stats reset clears the counters', async ($, on) => {
   expect(await stats($, 'stats reset')).toContain('cleared')
   expect(await stats($)).toContain('no statistics yet')
 })
+
+// ---- /context-guard ask ----
+
+test('/context-guard ask opens the dialog below the threshold, and the buttons really act', async ($, on) => {
+  let question = ''
+  let ran = 0
+  const clock = world(on, 100_000)
+  mock.store(on, settings)
+  on('ui.toast', () => ({ value: undefined }))
+  on('command.run', { command: 'compact' }, () => {
+    ran++
+    return { text: 'compacted' }
+  })
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
+    question = e.questions[0].question
+    return answer(e, 'Compact')
+  })
+  const reply = (await $.command.run({ command: 'context-guard', args: 'ask' })).text as string
+  expect(reply).toContain('opens now')
+  await clock.advance(1000)
+  expect(question).toBe('Context is 10% of the window (100K tokens). What now?')
+  expect(ran).toBe(1)
+})
+
+test('a preview from /context-guard ask is not counted in the statistics', async ($, on) => {
+  const clock = world(on, 100_000)
+  mock.store(on, settings)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => answer(e, 'Continue'))
+  await $.command.run({ command: 'context-guard', args: 'ask' })
+  await clock.advance(1000)
+  expect(await stats($)).toContain('no statistics yet')
+})
+
+test('/context-guard ask says so when nobody can answer', async ($, on) => {
+  let asked = 0
+  const clock = mock.clock(on)
+  surfaces(on, [])
+  listing(on)
+  mock.store(on, settings)
+  on('session.usage', () => ({ value: usage(100_000) }))
+  on('tool.call', { tool: 'AskUserQuestion' }, () => {
+    asked++
+    return { deny: 'nobody there' }
+  })
+  const reply = (await $.command.run({ command: 'context-guard', args: 'ask' })).text as string
+  await clock.advance(1000)
+  expect(reply).toContain('Nobody can answer')
+  expect(asked).toBe(0)
+})
