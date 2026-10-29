@@ -1,6 +1,6 @@
 # Session Kit
 
-**Version:** 13 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-18 20:44
+**Version:** 14 · **Created:** 2026-10-16 19:08 · **Updated:** 2026-10-29 17:36
 
 By Mike Daykhin | founder @ talenthunt.work
 
@@ -149,6 +149,24 @@ $.clock.after, $.clock.every, $.clock.now, $.command.list, $.command.register, $
 $.session.compact, $.session.surfaces, $.session.usage, $.store.delete, $.store.get, $.store.set, $.ui.ask,
 $.ui.invalidate, $.ui.log, $.ui.resolve, $.ui.toast
 ```
+
+## More from me
+
+- [LinkedIn preview](https://github.com/WIPexpert/linkedin-preview): a
+  Claude Code skill for LinkedIn posts. Claude writes the post and hands you
+  one HTML page that shows it the way the feed will, on a phone and on a
+  desktop, cut at "…more", with an editor and a 3,000-character counter.
+  [See an example](https://wipexpert.github.io/linkedin-preview/skills/linkedin-preview/examples/post.html).
+- [talenthunt job board](https://talenthunt.work/job-board?utm_source=skit&utm_medium=btn&utm_campaign=board&utm_content=readme):
+  every role comes with a fit check. Nothing is scraped: roles come from
+  curators or from members, and a person reviews each member's role before
+  it goes up.
+- [Job post composer](https://talenthunt.work/for-recruiters/best-job-post?utm_source=skit&utm_medium=btn&utm_campaign=genpost&utm_content=readme),
+  for people who hire: paste a job description and get a LinkedIn post that
+  tells candidates in seconds whether the role is theirs, with a fit check
+  link. Free during the open beta.
+- [JobHunt](https://t.me/JobsChannel_1), a Telegram channel in English with
+  roles picked by curators. The same curators fill the talenthunt job board.
 
 ## Problems
 
